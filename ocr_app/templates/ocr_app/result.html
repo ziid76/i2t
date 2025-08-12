@@ -6,8 +6,15 @@
 <div class="row">
     <div class="col-md-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>OCR 테이블 인식 결과</h2>
-            <a href="{% url 'index' %}" class="btn btn-secondary">새로운 이미지 업로드</a>
+            <h2>삼천리 검침 OCR 결과</h2>
+            <div>
+                {% if table_data %}
+                    <a href="{% url 'download_excel' ocr_result.pk %}" class="btn btn-success me-2">
+                        <i class="fas fa-download"></i> 엑셀 다운로드
+                    </a>
+                {% endif %}
+                <a href="{% url 'index' %}" class="btn btn-secondary">새로운 이미지 업로드</a>
+            </div>
         </div>
     </div>
 </div>
@@ -16,13 +23,29 @@
     <!-- 왼쪽: 이미지와 바운딩 박스 -->
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header">
-                <h5>원본 이미지 (바운딩 박스 표시)</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5>원본 이미지</h5>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="toggleBoundingBoxes">
+                        <i class="fas fa-eye" id="toggleIcon"></i> 바운딩 박스 숨기기
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="zoomImageBtn" data-bs-toggle="modal" data-bs-target="#imageModal">
+                        <i class="fas fa-search-plus"></i> 확대보기
+                    </button>
+                </div>
             </div>
             <div class="card-body">
                 <div class="image-container" id="imageContainer">
                     <img src="{{ image_url }}" alt="OCR 대상 이미지" id="ocrImage" class="img-fluid">
                     <!-- 바운딩 박스들이 JavaScript로 여기에 추가됩니다 -->
+                </div>
+                
+                <!-- 바운딩 박스 범례 -->
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <span class="badge" style="background-color: rgba(0, 123, 255, 0.3); border: 2px solid #007bff;">■</span> 높은 신뢰도 (≥0.98)
+                        <span class="badge ms-2" style="background-color: rgba(220, 53, 69, 0.3); border: 2px solid #dc3545;">■</span> 낮은 신뢰도 (<0.98)
+                    </small>
                 </div>
             </div>
         </div>
@@ -39,20 +62,28 @@
                     {% if table_data %}
                         {% for table in table_data %}
                             <div class="mb-4">
-                                <h6>테이블 {{ forloop.counter }}</h6>
-                                <table class="table table-bordered table-sm">
-                                    {% for row in table %}
-                                        <tr>
-                                            {% for cell in row %}
-                                                <td>{{ cell|default:"" }}</td>
-                                            {% endfor %}
-                                        </tr>
-                                    {% endfor %}
-                                </table>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6>테이블 {{ forloop.counter }}</h6>
+                                    <small class="text-muted">{{ table|length }}행 × {{ table.0|length }}열</small>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-sm table-hover">
+                                        {% for row in table %}
+                                            <tr>
+                                                {% for cell in row %}
+                                                    <td class="{% if forloop.parentloop.first %}table-primary fw-bold{% endif %}">
+                                                        {{ cell|default:"" }}
+                                                    </td>
+                                                {% endfor %}
+                                            </tr>
+                                        {% endfor %}
+                                    </table>
+                                </div>
                             </div>
                         {% endfor %}
                     {% else %}
                         <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
                             테이블 데이터를 찾을 수 없습니다.
                         </div>
                     {% endif %}
@@ -63,14 +94,38 @@
         <!-- OCR 원본 결과 (접을 수 있는 형태) -->
         <div class="card mt-3">
             <div class="card-header">
-                <button class="btn btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#rawResult">
-                    <h6>원본 OCR 결과 (JSON)</h6>
+                <button class="btn btn-link p-0 text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#rawResult">
+                    <h6><i class="fas fa-code"></i> 원본 OCR 결과 (JSON)</h6>
                 </button>
             </div>
             <div class="collapse" id="rawResult">
                 <div class="card-body">
                     <pre class="bg-light p-3" style="max-height: 400px; overflow-y: auto; font-size: 12px;">{{ ocr_result.ocr_result|pprint }}</pre>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 이미지 확대보기 모달 -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalLabel">이미지 확대보기</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="image-container-modal" id="imageContainerModal">
+                    <img src="{{ image_url }}" alt="OCR 대상 이미지" id="ocrImageModal" class="img-fluid" style="max-height: 80vh;">
+                    <!-- 모달용 바운딩 박스들이 JavaScript로 여기에 추가됩니다 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="toggleModalBoundingBoxes">
+                    <i class="fas fa-eye" id="toggleModalIcon"></i> 바운딩 박스 숨기기
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
             </div>
         </div>
     </div>
@@ -82,29 +137,74 @@
 document.addEventListener('DOMContentLoaded', function() {
     const boundingBoxes = {{ bounding_boxes|safe }};
     const imageContainer = document.getElementById('imageContainer');
+    const imageContainerModal = document.getElementById('imageContainerModal');
     const ocrImage = document.getElementById('ocrImage');
+    const ocrImageModal = document.getElementById('ocrImageModal');
+    const toggleBtn = document.getElementById('toggleBoundingBoxes');
+    const toggleIcon = document.getElementById('toggleIcon');
+    const toggleModalBtn = document.getElementById('toggleModalBoundingBoxes');
+    const toggleModalIcon = document.getElementById('toggleModalIcon');
+    
+    let boundingBoxesVisible = true;
+    let modalBoundingBoxesVisible = true;
 
     // 이미지 로드 완료 후 바운딩 박스 그리기
     ocrImage.onload = function() {
-        drawBoundingBoxes();
+        drawBoundingBoxes(imageContainer, ocrImage, 'main');
+    };
+
+    ocrImageModal.onload = function() {
+        drawBoundingBoxes(imageContainerModal, ocrImageModal, 'modal');
     };
 
     // 이미지가 이미 로드된 경우
     if (ocrImage.complete) {
-        drawBoundingBoxes();
+        drawBoundingBoxes(imageContainer, ocrImage, 'main');
     }
 
-    function drawBoundingBoxes() {
+    // 바운딩 박스 토글 기능
+    toggleBtn.addEventListener('click', function() {
+        boundingBoxesVisible = !boundingBoxesVisible;
+        toggleBoundingBoxVisibility('main', boundingBoxesVisible);
+        
+        if (boundingBoxesVisible) {
+            toggleIcon.className = 'fas fa-eye';
+            toggleBtn.innerHTML = '<i class="fas fa-eye" id="toggleIcon"></i> 바운딩 박스 숨기기';
+        } else {
+            toggleIcon.className = 'fas fa-eye-slash';
+            toggleBtn.innerHTML = '<i class="fas fa-eye-slash" id="toggleIcon"></i> 바운딩 박스 보이기';
+        }
+    });
+
+    // 모달 바운딩 박스 토글 기능
+    toggleModalBtn.addEventListener('click', function() {
+        modalBoundingBoxesVisible = !modalBoundingBoxesVisible;
+        toggleBoundingBoxVisibility('modal', modalBoundingBoxesVisible);
+        
+        if (modalBoundingBoxesVisible) {
+            toggleModalIcon.className = 'fas fa-eye';
+            toggleModalBtn.innerHTML = '<i class="fas fa-eye" id="toggleModalIcon"></i> 바운딩 박스 숨기기';
+        } else {
+            toggleModalIcon.className = 'fas fa-eye-slash';
+            toggleModalBtn.innerHTML = '<i class="fas fa-eye-slash" id="toggleModalIcon"></i> 바운딩 박스 보이기';
+        }
+    });
+
+    // 모달이 열릴 때 바운딩 박스 다시 그리기
+    document.getElementById('imageModal').addEventListener('shown.bs.modal', function() {
+        setTimeout(() => {
+            drawBoundingBoxes(imageContainerModal, ocrImageModal, 'modal');
+        }, 100);
+    });
+
+    function drawBoundingBoxes(container, image, type) {
         // 기존 바운딩 박스 제거
-        const existingBoxes = imageContainer.querySelectorAll('.bounding-box');
+        const existingBoxes = container.querySelectorAll('.bounding-box');
         existingBoxes.forEach(box => box.remove());
 
-        const imageRect = ocrImage.getBoundingClientRect();
-        const containerRect = imageContainer.getBoundingClientRect();
-        
         // 이미지의 실제 크기와 표시 크기 비율 계산
-        const scaleX = ocrImage.offsetWidth / ocrImage.naturalWidth;
-        const scaleY = ocrImage.offsetHeight / ocrImage.naturalHeight;
+        const scaleX = image.offsetWidth / image.naturalWidth;
+        const scaleY = image.offsetHeight / image.naturalHeight;
 
         boundingBoxes.forEach((box, index) => {
             if (box.vertices && box.vertices.length >= 4) {
@@ -116,23 +216,48 @@ document.addEventListener('DOMContentLoaded', function() {
                 const maxX = Math.max(...vertices.map(v => v.x)) * scaleX;
                 const maxY = Math.max(...vertices.map(v => v.y)) * scaleY;
 
+                // 신뢰도에 따른 색상 결정
+                const confidence = box.confidence || 1.0;
+                const isLowConfidence = confidence < 0.98;
+                const borderColor = isLowConfidence ? '#dc3545' : '#007bff';
+                const backgroundColor = isLowConfidence ? 'rgba(220, 53, 69, 0.1)' : 'rgba(0, 123, 255, 0.1)';
+
                 // 바운딩 박스 엘리먼트 생성
                 const boundingBox = document.createElement('div');
-                boundingBox.className = 'bounding-box';
+                boundingBox.className = `bounding-box bounding-box-${type}`;
+                boundingBox.style.position = 'absolute';
                 boundingBox.style.left = minX + 'px';
                 boundingBox.style.top = minY + 'px';
                 boundingBox.style.width = (maxX - minX) + 'px';
                 boundingBox.style.height = (maxY - minY) + 'px';
-                boundingBox.title = box.text || '';
+                boundingBox.style.border = `2px solid ${borderColor}`;
+                boundingBox.style.backgroundColor = backgroundColor;
+                boundingBox.style.pointerEvents = 'none';
+                boundingBox.style.zIndex = '10';
+                
+                // 툴팁 추가
+                boundingBox.title = `${box.text || ''} (신뢰도: ${(confidence * 100).toFixed(1)}%)`;
 
-                imageContainer.appendChild(boundingBox);
+                container.appendChild(boundingBox);
             }
+        });
+    }
+
+    function toggleBoundingBoxVisibility(type, visible) {
+        const boxes = document.querySelectorAll(`.bounding-box-${type}`);
+        boxes.forEach(box => {
+            box.style.display = visible ? 'block' : 'none';
         });
     }
 
     // 윈도우 리사이즈 시 바운딩 박스 다시 그리기
     window.addEventListener('resize', function() {
-        setTimeout(drawBoundingBoxes, 100);
+        setTimeout(() => {
+            drawBoundingBoxes(imageContainer, ocrImage, 'main');
+            if (document.getElementById('imageModal').classList.contains('show')) {
+                drawBoundingBoxes(imageContainerModal, ocrImageModal, 'modal');
+            }
+        }, 100);
     });
 });
 </script>

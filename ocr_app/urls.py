@@ -5,4 +5,5 @@ urlpatterns = [
     path('', views.index, name='index'),
     path('result/<int:pk>/', views.ocr_result, name='ocr_result'),
     path('api/results/', views.get_ocr_results, name='api_results'),
+    path('download/<int:pk>/', views.download_excel, name='download_excel'),
 ]
