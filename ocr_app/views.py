@@ -82,3 +82,7 @@ def get_ocr_results(request):
         })
     
     return JsonResponse({'results': data})
+
+
+
+
