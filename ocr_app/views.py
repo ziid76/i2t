@@ -22,7 +22,7 @@ def index(request):
 
             # S3 업로드 (file-like 사용)
             buf.seek(0)
-            s3_url = upload_to_s3(buf, up.name, content_type=getattr(up, 'content_type', None))
+            s3_url = upload_to_s3(buf, up.name)
             if not s3_url:
                 messages.error(request, 'S3 업로드에 실패했습니다.')
                 return redirect('index')
