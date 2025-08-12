@@ -2,7 +2,7 @@ from django.db import models
 import json
 
 class OCRResult(models.Model):
-    image_file = models.ImageField(upload_to='uploads/')
+    image_file = models.ImageField(upload_to='uploads/', blank=True, null=True)  # ← 추가
     s3_url = models.URLField(max_length=500)
     ocr_result = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)

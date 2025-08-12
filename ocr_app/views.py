@@ -5,41 +5,47 @@ from .forms import ImageUploadForm
 from .models import OCRResult
 from .utils import upload_to_s3, call_naver_ocr_api, save_ocr_result_to_file
 import json
+from io import BytesIO
 
 def index(request):
-    """메인 페이지"""
     if request.method == 'POST':
         form = ImageUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            # 폼 저장 (임시)
-            ocr_result = form.save(commit=False)
-            
-            # S3에 이미지 업로드
-            image_file = request.FILES['image_file']
-            s3_url = upload_to_s3(image_file, image_file.name)
-            
-            if s3_url:
-                ocr_result.s3_url = s3_url
-                
-                # 네이버 OCR API 호출
-                ocr_response = call_naver_ocr_api(s3_url)
-                
-                if ocr_response:
-                    ocr_result.ocr_result = ocr_response
-                    ocr_result.save()
-                    
-                    # JSON 파일로 저장
-                    save_ocr_result_to_file(ocr_response)
-                    
-                    messages.success(request, 'OCR 처리가 완료되었습니다.')
-                    return redirect('ocr_result', pk=ocr_result.pk)
-                else:
-                    messages.error(request, 'OCR API 호출에 실패했습니다.')
-            else:
+            up = request.FILES.get('image_file')
+            if not up:
+                messages.error(request, '파일이 없습니다.')
+                return redirect('index')
+
+            # 업로드 스트림 → 메모리 복사(한 번만 read)
+            blob = up.read()
+            buf = BytesIO(blob)
+
+            # S3 업로드 (file-like 사용)
+            buf.seek(0)
+            s3_url = upload_to_s3(buf, up.name, content_type=getattr(up, 'content_type', None))
+            if not s3_url:
                 messages.error(request, 'S3 업로드에 실패했습니다.')
+                return redirect('index')
+
+            # 모델 저장 (image_file은 비워둠)
+            ocr_result = form.save(commit=False)
+            ocr_result.image_file = None
+            ocr_result.s3_url = s3_url
+
+            # OCR 호출
+            ocr_response = call_naver_ocr_api(s3_url)
+            if not ocr_response:
+                messages.error(request, 'OCR API 호출에 실패했습니다.')
+                return redirect('index')
+
+            ocr_result.ocr_result = ocr_response
+            ocr_result.save()
+
+            save_ocr_result_to_file(ocr_response)
+            messages.success(request, 'OCR 처리가 완료되었습니다.')
+            return redirect('ocr_result', pk=ocr_result.pk)
     else:
         form = ImageUploadForm()
-    
     return render(request, 'ocr_app/index.html', {'form': form})
 
 def ocr_result(request, pk):
