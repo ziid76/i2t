@@ -1,0 +1,119 @@
+{% extends 'ocr_app/base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <h2 class="text-center mb-4">이미지 업로드 및 OCR 테이블 인식</h2>
+        
+        <form method="post" enctype="multipart/form-data" id="uploadForm">
+            {% csrf_token %}
+            <div class="upload-area" id="uploadArea">
+                <div class="mb-3">
+                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                    <h5>JPG 파일을 선택하거나 드래그하여 업로드하세요</h5>
+                    <p class="text-muted">최대 파일 크기: 10MB</p>
+                </div>
+                {{ form.image_file }}
+            </div>
+            
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                    <span class="spinner-border spinner-border-sm d-none" id="loadingSpinner"></span>
+                    OCR 처리 시작
+                </button>
+            </div>
+        </form>
+
+        <div class="mt-5">
+            <h4>최근 처리 결과</h4>
+            <div id="recentResults" class="row">
+                <!-- 최근 결과가 여기에 로드됩니다 -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('imageFile');
+    const form = document.getElementById('uploadForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+
+    // 드래그 앤 드롭 기능
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            updateFileName(files[0].name);
+        }
+    });
+
+    // 파일 선택 시 파일명 표시
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            updateFileName(e.target.files[0].name);
+        }
+    });
+
+    function updateFileName(fileName) {
+        const uploadText = uploadArea.querySelector('h5');
+        uploadText.textContent = `선택된 파일: ${fileName}`;
+    }
+
+    // 폼 제출 시 로딩 표시
+    form.addEventListener('submit', function() {
+        submitBtn.disabled = true;
+        loadingSpinner.classList.remove('d-none');
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 처리 중...';
+    });
+
+    // 최근 결과 로드
+    loadRecentResults();
+});
+
+function loadRecentResults() {
+    fetch('/api/results/')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('recentResults');
+            container.innerHTML = '';
+            
+            data.results.forEach(result => {
+                const resultCard = `
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <img src="${result.image_url}" class="card-img-top" style="height: 150px; object-fit: cover;">
+                            <div class="card-body">
+                                <p class="card-text small">${result.created_at}</p>
+                                ${result.has_result ? 
+                                    `<a href="/result/${result.id}/" class="btn btn-sm btn-primary">결과 보기</a>` :
+                                    `<span class="badge bg-warning">처리 중</span>`
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += resultCard;
+            });
+        })
+        .catch(error => console.error('Error loading recent results:', error));
+}
+</script>
+{% endblock %}

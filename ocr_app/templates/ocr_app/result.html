@@ -1,0 +1,139 @@
+{% extends 'ocr_app/base.html' %}
+
+{% block title %}OCR 결과 - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>OCR 테이블 인식 결과</h2>
+            <a href="{% url 'index' %}" class="btn btn-secondary">새로운 이미지 업로드</a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- 왼쪽: 이미지와 바운딩 박스 -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>원본 이미지 (바운딩 박스 표시)</h5>
+            </div>
+            <div class="card-body">
+                <div class="image-container" id="imageContainer">
+                    <img src="{{ image_url }}" alt="OCR 대상 이미지" id="ocrImage" class="img-fluid">
+                    <!-- 바운딩 박스들이 JavaScript로 여기에 추가됩니다 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 오른쪽: 테이블 결과 -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>인식된 테이블 데이터</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-container">
+                    {% if table_data %}
+                        {% for table in table_data %}
+                            <div class="mb-4">
+                                <h6>테이블 {{ forloop.counter }}</h6>
+                                <table class="table table-bordered table-sm">
+                                    {% for row in table %}
+                                        <tr>
+                                            {% for cell in row %}
+                                                <td>{{ cell|default:"" }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </table>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-warning">
+                            테이블 데이터를 찾을 수 없습니다.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- OCR 원본 결과 (접을 수 있는 형태) -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <button class="btn btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#rawResult">
+                    <h6>원본 OCR 결과 (JSON)</h6>
+                </button>
+            </div>
+            <div class="collapse" id="rawResult">
+                <div class="card-body">
+                    <pre class="bg-light p-3" style="max-height: 400px; overflow-y: auto; font-size: 12px;">{{ ocr_result.ocr_result|pprint }}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const boundingBoxes = {{ bounding_boxes|safe }};
+    const imageContainer = document.getElementById('imageContainer');
+    const ocrImage = document.getElementById('ocrImage');
+
+    // 이미지 로드 완료 후 바운딩 박스 그리기
+    ocrImage.onload = function() {
+        drawBoundingBoxes();
+    };
+
+    // 이미지가 이미 로드된 경우
+    if (ocrImage.complete) {
+        drawBoundingBoxes();
+    }
+
+    function drawBoundingBoxes() {
+        // 기존 바운딩 박스 제거
+        const existingBoxes = imageContainer.querySelectorAll('.bounding-box');
+        existingBoxes.forEach(box => box.remove());
+
+        const imageRect = ocrImage.getBoundingClientRect();
+        const containerRect = imageContainer.getBoundingClientRect();
+        
+        // 이미지의 실제 크기와 표시 크기 비율 계산
+        const scaleX = ocrImage.offsetWidth / ocrImage.naturalWidth;
+        const scaleY = ocrImage.offsetHeight / ocrImage.naturalHeight;
+
+        boundingBoxes.forEach((box, index) => {
+            if (box.vertices && box.vertices.length >= 4) {
+                const vertices = box.vertices;
+                
+                // 바운딩 박스의 최소/최대 좌표 계산
+                const minX = Math.min(...vertices.map(v => v.x)) * scaleX;
+                const minY = Math.min(...vertices.map(v => v.y)) * scaleY;
+                const maxX = Math.max(...vertices.map(v => v.x)) * scaleX;
+                const maxY = Math.max(...vertices.map(v => v.y)) * scaleY;
+
+                // 바운딩 박스 엘리먼트 생성
+                const boundingBox = document.createElement('div');
+                boundingBox.className = 'bounding-box';
+                boundingBox.style.left = minX + 'px';
+                boundingBox.style.top = minY + 'px';
+                boundingBox.style.width = (maxX - minX) + 'px';
+                boundingBox.style.height = (maxY - minY) + 'px';
+                boundingBox.title = box.text || '';
+
+                imageContainer.appendChild(boundingBox);
+            }
+        });
+    }
+
+    // 윈도우 리사이즈 시 바운딩 박스 다시 그리기
+    window.addEventListener('resize', function() {
+        setTimeout(drawBoundingBoxes, 100);
+    });
+});
+</script>
+{% endblock %}
