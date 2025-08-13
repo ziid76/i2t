@@ -56,11 +56,37 @@ def ocr_result(request, pk):
     try:
         ocr_result = OCRResult.objects.get(pk=pk)
         table_data = ocr_result.get_table_data()
+        table_data_with_confidence = ocr_result.get_table_data_with_confidence()
         bounding_boxes = ocr_result.get_bounding_boxes()
+        
+        # 템플릿에서 사용하기 쉽도록 테이블 데이터 전처리
+        processed_tables = []
+        for table_info in table_data_with_confidence:
+            table_data_matrix = table_info['data']
+            confidence_matrix = table_info['confidence']
+            
+            processed_rows = []
+            for i, row in enumerate(table_data_matrix):
+                processed_cells = []
+                for j, cell in enumerate(row):
+                    confidence = confidence_matrix[i][j] if i < len(confidence_matrix) and j < len(confidence_matrix[i]) else 1.0
+                    processed_cells.append({
+                        'text': cell,
+                        'confidence': confidence,
+                        'is_low_confidence': confidence < 0.98
+                    })
+                processed_rows.append(processed_cells)
+            
+            processed_tables.append({
+                'rows': processed_rows,
+                'row_count': len(table_data_matrix),
+                'col_count': len(table_data_matrix[0]) if table_data_matrix else 0
+            })
         
         context = {
             'ocr_result': ocr_result,
             'table_data': table_data,
+            'processed_tables': processed_tables,
             'bounding_boxes': json.dumps(bounding_boxes),
             'image_url': ocr_result.image_file.url if ocr_result.image_file else ocr_result.s3_url
         }
