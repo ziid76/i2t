@@ -17,14 +17,6 @@ Django 기반의 네이버 OCR API를 사용한 테이블 인식 웹 애플리�
 
 `.env` 파일을 수정하여 AWS 및 네이버 OCR API 설정을 입력하세요:
 
-```bash
-AWS_ACCESS_KEY_ID=your-access-key-id
-AWS_SECRET_ACCESS_KEY=your-secret-access-key
-AWS_STORAGE_BUCKET_NAME=your-bucket-name
-AWS_S3_REGION_NAME=ap-northeast-2
-NAVER_OCR_API_URL=https://gxx9jkyalr.apigw.ntruss.com/custom/v1/45084/126322645cd06458ae58d8755741bc835005c36d93b372a18efc73b9c3f5d48f/general
-NAVER_OCR_SECRET=ZGFvS1hCVUxrU0ZEaktXU2RvSFRIdWtET2prTXRBT2s=
-```
 
 ### 2. 가상환경 및 패키지 설치
 
